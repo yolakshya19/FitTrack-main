@@ -1,0 +1,142 @@
+import cv2
+import mediapipe as mp
+import numpy as np
+import pyttsx3  # For audio feedback
+import threading  # For asynchronous audio feedback
+
+# Initialize mediapipe, drawing utilities, and text-to-speech engine
+mp_drawing = mp.solutions.drawing_utils
+mp_pose = mp.solutions.pose
+engine = pyttsx3.init()
+
+# Function to calculate the angle between three points
+def calculate_angle(a, b, c):
+    a = np.array(a)  # First point
+    b = np.array(b)  # Mid point
+    c = np.array(c)  # End point
+
+    radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
+    angle = np.abs(radians * 180.0 / np.pi)
+
+    if angle > 180.0:
+        angle = 360 - angle
+
+    return angle
+
+# Initialize video capture
+cap = cv2.VideoCapture(0)
+
+# Exercise counter variables
+counter = 0
+stage = None
+exercise = "Shoulder Press"  # Only track Shoulder Press
+total_score = 0  # Accumulate scores for each rep
+rep_score = 0  # Score for the current rep
+feedback = ""
+frame_count = 0
+frame_skip = 2  # Skip every second frame to optimize performance
+
+# Function to calculate score and provide suggestions based on posture accuracy
+def calculate_score_and_suggestion(angle, ideal_range, exercise_type):
+    # Define exercise-specific feedback
+    if exercise_type == "Shoulder Press":
+        if angle < ideal_range[0] - 10:
+            return 5, "Press your arms higher."
+        elif angle > ideal_range[1] + 10:
+            return 5, "Lower your arms down."
+    
+    # Perfect form feedback
+    return 10, ""  # No feedback for good posture
+
+# Function to give audio feedback for incorrect posture
+def give_audio_feedback(message):
+    # Run the audio feedback in a separate thread to prevent hanging
+    def speak():
+        engine.say(message)
+        engine.runAndWait()
+    
+    # Start a new thread for feedback
+    if message:  # Only give feedback if there's an actual message
+        threading.Thread(target=speak).start()
+
+# Setup mediapipe instance
+with mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7) as pose:
+    while cap.isOpened():
+        frame_count += 1
+        ret, frame = cap.read()
+
+        # Skip frames to optimize performance
+        if frame_count % frame_skip != 0:
+            continue
+
+        # Resize frame for better performance
+        frame = cv2.resize(frame, (640, 480))
+
+        # Recolor image to RGB
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image.flags.writeable = False
+
+        # Process the image to detect poses
+        results = pose.process(image)
+
+        # Recolor back to BGR for rendering
+        image.flags.writeable = True
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+        try:
+            landmarks = results.pose_landmarks.landmark
+
+            # Get coordinates for specific body landmarks
+            shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
+                        landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+            elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
+                     landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
+            wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
+                     landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+            
+            # Calculate relevant angles for Shoulder Press
+            elbow_angle = calculate_angle(shoulder, elbow, wrist)
+
+            # Shoulder Press logic
+            if exercise == "Shoulder Press":
+                if elbow_angle > 160:
+                    stage = "down"
+                if elbow_angle < 60 and stage == 'down':
+                    stage = "up"
+                    counter += 1
+                    rep_score, feedback = calculate_score_and_suggestion(elbow_angle, (60, 160), "Shoulder Press")
+                    total_score += rep_score
+                    if rep_score < 7:
+                        give_audio_feedback(feedback)
+
+        except:
+            pass
+
+        # Setup status box
+        cv2.rectangle(image, (0, 0), (350, 130), (245, 117, 16), -1)
+
+        # Display exercise name
+        cv2.putText(image, 'EXERCISE: ' + exercise, (10, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+
+        # Display rep count
+        cv2.putText(image, 'REPS: ' + str(counter), (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+
+        # Display score
+        cv2.putText(image, 'SCORE: ' + str(rep_score), (10, 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+
+        # Render detection results on the frame
+        mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                  mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
+                                  mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
+
+        # Show the final image
+        cv2.imshow('Exercise Detection', image)
+
+        if cv2.waitKey(10) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
