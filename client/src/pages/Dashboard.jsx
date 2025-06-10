@@ -64,6 +64,7 @@ const CardWrapper = styled.div`
 `;
 
 const Dashboard = () => {
+  // eslint-disable-next-line
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState();
   const [buttonLoading, setButtonLoading] = useState(false);

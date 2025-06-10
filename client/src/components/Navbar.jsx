@@ -274,6 +274,7 @@ const Navbar = ({ currentUser }) => {
           <Navlink to="/">Dashboard</Navlink>
           <Navlink to="/workouts">Workouts</Navlink>
           <Navlink to="/exercise">Exercise</Navlink>
+          <Navlink to="/tutorial">Tutorial</Navlink>
           <Navlink to="/blogs">Blogs</Navlink>
         </MobileMenu>
 
@@ -281,6 +282,7 @@ const Navbar = ({ currentUser }) => {
           <Navlink to="/">Dashboard</Navlink>
           <Navlink to="/workouts">Workouts</Navlink>
           <Navlink to="/exercise">Exercise</Navlink>
+          <Navlink to="/tutorial">Tutorial</Navlink>
           <Navlink to="/blogs">Blogs</Navlink>
         </NavItems>
 

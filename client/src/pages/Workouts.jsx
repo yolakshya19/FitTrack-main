@@ -73,6 +73,7 @@ const SecTitle = styled.div`
 `;
 
 const Workouts = () => {
+  // eslint-disable-next-line
   const dispatch = useDispatch();
   const [todaysWorkouts, setTodaysWorkouts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -89,7 +90,7 @@ const Workouts = () => {
   };
 
   useEffect(() => {
-    getTodaysWorkout();
+    getTodaysWorkout(); // eslint-disable-next-line
   }, [date]);
   return (
     <Container>
